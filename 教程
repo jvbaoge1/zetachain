@@ -1,0 +1,74 @@
+# ZetaChain Hello 教程完整步骤（WSL + PowerShell 环境）
+
+> 适用于：已在 WSL 中正确安装 Node.js、Foundry、Git、yarn 的用户  
+> 环境：PowerShell 中打开的 WSL（如 Ubuntu）  
+> 目标：干净、正确地跑通 [ZetaChain Hello 教程](https://www.zetachain.com/docs/developers/tutorials/hello)
+
+
+ ✅ 第一步：打开两个 WSL 终端
+- **终端 A**：运行 Localnet（保持常驻）
+- **终端 B**：编译、部署、调用
+
+> 💡 在 Windows Terminal 中：点击顶部下拉 → “新建标签页” → 选择你的 WSL
+
+ ✅ 第二步：设置国内镜像（防 502）
+```bash
+yarn config set registry https://registry.npmmirror.com
+
+✅ 第三步：创建项目
+cd ~
+mkdir -p projects
+cd projects
+npx zetachain@latest new --project hello
+cd hello
+
+✅ 第四步：安装依赖
+yarn install
+forge soldeer update
+
+✅ 第五步：编译合约
+forge build
+# 成功标志：Compiler run successful（警告可忽略）
+
+✅ 第六步：启动 Localnet（终端 A）
+cd ~/projects/hello
+npx zetachain localnet start
+✅ 看到 ZETACHAIN / ETHEREUM 表格即成功
+📌 不要关闭此终端！ 
+
+✅ 第七步：部署合约（终端 B）
+sudo apt update && sudo apt install -y jq  # 如未安装 jq
+
+PRIVATE_KEY=$(jq -r '.private_keys[0]' ~/.zetachain/localnet/anvil.json)
+
+UNIVERSAL=$(forge create Universal \
+  --rpc-url http://localhost:8545 \
+  --private-key $PRIVATE_KEY \
+  --evm-version paris \
+  --broadcast \
+  --json | jq -r .deployedTo)
+
+echo "✅ 合约已部署到: $UNIVERSAL"
+
+✅ 第八步：发送跨链消息 "hello"
+GATEWAY_EVM=$(jq -r '.["11155112"].contracts[] | select(.contractType == "gateway") | .address' ~/.zetachain/localnet/registry.json)
+
+npx zetachain evm call \
+  --rpc http://localhost:8545 \
+  --gateway $GATEWAY_EVM \
+  --receiver $UNIVERSAL \
+  --private-key $PRIVATE_KEY \
+  --types string \
+  --values hello
+👉 当提示 ? Proceed with the transaction? (Y/n) 时，按 Y + 回车
+
+✅ 第九步：验证成功
+在 终端 A 中应看到：
+[ZetaChain]: Event from onCall
+Hello: hello
+🎉 恭喜！你成功完成了 ZetaChain Hello 教程！
+
+🔁 重来？
+# 关掉终端 A（Ctrl+C）
+rm -rf ~/projects/hello  # 可选：清理项目
+# 然后从第三步重新开始
